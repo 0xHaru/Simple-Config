@@ -148,89 +148,6 @@ error(Scanner *s, CfgError *err, const char *fmt, ...)
         }
     }
 
-#ifdef CFG_DETAILED_ERRORS
-    {
-        const char *src = s->src;
-
-        // Get line offset containing the error's location
-        int line_off = cur(s);
-
-        while (line_off > 0) {
-            if (src[line_off - 1] == '\n')
-                break;
-            line_off--;
-        }
-
-        int line_len = 0;
-        for (int i = line_off; i < s->len; i++) {
-            if (src[i] == '\n') {
-                if (i > 0 && src[i - 1] == '\r')
-                    line_len--;
-                break;
-            }
-            line_len++;
-        }
-
-        int prev_line_off;
-        int prev_line_len;
-
-        if (line_off == 0) {
-            prev_line_off = 0;
-            prev_line_len = 0;
-        } else {
-            prev_line_off = line_off - 1;
-            while (prev_line_off > 0) {
-                if (src[prev_line_off - 1] == '\n')
-                    break;
-                prev_line_off--;
-            }
-            prev_line_len = line_off - prev_line_off - 1;
-        }
-
-        int next_line_off;
-        int next_line_len;
-
-        if (line_off + line_len == s->len) {
-            next_line_off = 0;
-            next_line_len = 0;
-        } else {
-            next_line_off = line_off + line_len + 1;
-            if (src[next_line_off] == '\n')
-                next_line_off++;
-            next_line_len = 0;
-            while (next_line_off + next_line_len < s->len &&
-                   src[next_line_off + next_line_len] != '\n')
-                next_line_len++;
-        }
-
-        err->truncated[0] = false;
-        err->truncated[1] = false;
-        err->truncated[2] = false;
-
-        if (prev_line_len >= (int) sizeof(err->lines[0])) {
-            prev_line_len = (int) sizeof(err->lines[0]) - 1;
-            err->truncated[0] = true;
-        }
-
-        if (line_len >= (int) sizeof(err->lines[1])) {
-            line_len = (int) sizeof(err->lines[1]) - 1;
-            err->truncated[1] = true;
-        }
-
-        if (next_line_len >= (int) sizeof(err->lines[2])) {
-            next_line_len = (int) sizeof(err->lines[2]) - 1;
-            err->truncated[2] = true;
-        }
-
-        memcpy(err->lines[0], src + prev_line_off, prev_line_len);
-        memcpy(err->lines[1], src + line_off, line_len);
-        memcpy(err->lines[2], src + next_line_off, next_line_len);
-        err->lines[0][prev_line_len] = '\0';
-        err->lines[1][line_len] = '\0';
-        err->lines[2][next_line_len] = '\0';
-    }
-#endif
-
     va_list vargs;
     va_start(vargs, fmt);
     snprintf(err->msg, CFG_MAX_ERR, prefix);
@@ -246,18 +163,6 @@ cfg_fprint_error(FILE *stream, CfgError *err)
         fprintf(stream, "Error: %s\n", err->msg);
     else
         fprintf(stream, "Error at %d:%d :: %s\n", err->row, err->col, err->msg);
-
-#ifdef CFG_DETAILED_ERRORS
-    fprintf(stream, "\n");
-    if (err->row > 0)
-        fprintf(stream, "%4d | %s %s\n", err->row - 1, err->lines[0],
-                err->truncated[0] ? "[...]" : "");
-    fprintf(stream, "%4d | %s %s <------ Error is here!\n", err->row,
-            err->lines[1], err->truncated[1] ? "[...]" : "");
-    fprintf(stream, "%4d | %s %s\n", err->row + 1, err->lines[2],
-            err->truncated[2] ? "[...]" : "");
-    fprintf(stream, "\n");
-#endif
 }
 
 static int

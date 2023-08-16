@@ -5,8 +5,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-// #define CFG_DETAILED_ERRORS
-
 #define CFG_FILE_EXT ".cfg"
 
 #define CFG_MAX_KEY 32
@@ -18,12 +16,6 @@ typedef struct {
     int col;
     int row;
     char msg[CFG_MAX_ERR];
-
-#ifdef CFG_DETAILED_ERRORS
-    bool truncated[3];
-    char lines[3][64];
-#endif
-
 } CfgError;
 
 typedef struct {
