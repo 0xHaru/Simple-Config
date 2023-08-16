@@ -21,7 +21,7 @@ main(void)
 {
     CfgError err;
     CfgEntry *entries = malloc(64 * sizeof(CfgEntry));
-    Cfg cfg = {.entries = entries, .capacity = TEST_CAPACITY};
+    Cfg cfg = {.entries = entries, .capacity = 64};
 
     int res = cfg_load("sample.cfg", &cfg, &err);
 
