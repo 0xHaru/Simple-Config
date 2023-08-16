@@ -107,4 +107,4 @@ This project was built as a collaborative work by [Haru](https://github.com/0xHa
 
 ## License
 
-This project uses the [GPLv3]() license.
+This project uses the GPLv3 license.
