@@ -95,12 +95,25 @@ skip_whitespace_and_comments(Scanner *s)
     }
 }
 
-static void
-copy_slice_into(Scanner *s, int src_off, int src_len, char *dst, int max)
+static void *
+alloc(Cfg *cfg, int size, int align)
 {
-    assert(src_len < max);
-    memcpy(dst, s->src + src_off, src_len);
-    dst[src_len] = '\0';
+    int avail = cfg->capacity - cfg->offset;
+    int padding = -cfg->offset & (align - 1);
+    if (size > avail - padding)
+        return NULL;
+    void *p = cfg->arena + cfg->offset + padding;
+    cfg->offset += padding + size;
+    return memset(p, 0, size);
+}
+
+static void *
+make_string(Cfg *cfg, Scanner *s, int src_off, int src_len)
+{
+    char *dst = alloc(cfg, src_len + 1, 1);
+    if (dst != NULL)
+        memcpy(dst, s->src + src_off, src_len);
+    return dst;
 }
 
 static bool
@@ -167,7 +180,7 @@ cfg_fprint_error(FILE *stream, CfgError *err)
 }
 
 static int
-parse_string(Scanner *s, CfgEntry *entry, CfgError *err)
+parse_string(Cfg *cfg, Scanner *s, CfgEntry *entry, CfgError *err)
 {
     // Consume opening '"'
     advance(s);
@@ -181,14 +194,13 @@ parse_string(Scanner *s, CfgEntry *entry, CfgError *err)
         return error(s, err, "closing '\"' expected");
 
     int val_len = cur(s) - val_offset;
-    if (val_len > CFG_MAX_VAL)
-        return error(s, err, "value too long");
 
     // Consume closing '"'
     advance(s);
 
-    copy_slice_into(s, val_offset, val_len, entry->val.string,
-                    sizeof(entry->val.string));
+    entry->val.string = make_string(cfg, s, val_offset, val_len);
+    if (entry->val.string == NULL)
+        return error(s, err, "out of memory");
     entry->type = CFG_TYPE_STRING;
     return 0;
 }
@@ -382,7 +394,7 @@ parse_literal(Scanner *s, CfgEntry *entry, CfgError *err)
 }
 
 static int
-parse_value(Scanner *s, CfgEntry *entry, CfgError *err)
+parse_value(Cfg *cfg, Scanner *s, CfgEntry *entry, CfgError *err)
 {
     // Skip blank space between ':' and the value
     skip_blank(s);
@@ -394,7 +406,7 @@ parse_value(Scanner *s, CfgEntry *entry, CfgError *err)
     char c = peek(s);
 
     if (c == '"')
-        return parse_string(s, entry, err);
+        return parse_string(cfg, s, entry, err);
     else if (isalpha(c))
         return parse_literal(s, entry, err);
     else if (isdigit(c) || (c == '-' && isdigit(peek_next(s))))
@@ -404,7 +416,7 @@ parse_value(Scanner *s, CfgEntry *entry, CfgError *err)
 }
 
 static int
-parse_key(Scanner *s, CfgEntry *entry, CfgError *err)
+parse_key(Cfg *cfg, Scanner *s, CfgEntry *entry, CfgError *err)
 {
     if (is_at_end(s) || !is_key(peek(s)))
         return error(s, err, "missing key");
@@ -416,10 +428,10 @@ parse_key(Scanner *s, CfgEntry *entry, CfgError *err)
     while (!is_at_end(s) && is_key(peek(s)));
     int key_len = cur(s) - key_offset;
 
-    if (key_len > CFG_MAX_KEY)
-        return error(s, err, "key too long");
+    entry->key = make_string(cfg, s, key_offset, key_len);
+    if (entry->key == NULL)
+        return error(s, err, "out of memory");
 
-    copy_slice_into(s, key_offset, key_len, entry->key, sizeof(entry->key));
     return 0;
 }
 
@@ -438,15 +450,15 @@ consume_colon(Scanner *s, CfgError *err)
 }
 
 static int
-parse_entry(Scanner *s, CfgEntry *entry, CfgError *err)
+parse_entry(Cfg *cfg, Scanner *s, CfgEntry *entry, CfgError *err)
 {
-    if (parse_key(s, entry, err) != 0)
+    if (parse_key(cfg, s, entry, err) != 0)
         return -1;
 
     if (consume_colon(s, err) != 0)
         return -1;
 
-    if (parse_value(s, entry, err) != 0)
+    if (parse_value(cfg, s, entry, err) != 0)
         return -1;
 
     // Skip trailing blank space after the value
@@ -472,16 +484,19 @@ cfg_parse(const char *src, int src_len, Cfg *cfg, CfgError *err)
     init_scanner(&s, src, src_len);
     init_error(err);
 
-    cfg->count = 0;
     skip_whitespace_and_comments(&s);
 
-    while (!is_at_end(&s) && cfg->count < cfg->capacity) {
-        CfgEntry *entry = &cfg->entries[cfg->count];
+    while (!is_at_end(&s)) {
+        CfgEntry *entry = alloc(cfg, sizeof(*entry), sizeof(void *));
+        if (entry == NULL)
+            return error(&s, err, "out of memory");
 
-        if (parse_entry(&s, entry, err) != 0)
+        if (parse_entry(cfg, &s, entry, err) != 0)
             return -1;
 
-        cfg->count++;
+        entry->next = cfg->entries;
+        cfg->entries = entry;
+
         skip_whitespace_and_comments(&s);
     }
 
@@ -489,7 +504,7 @@ cfg_parse(const char *src, int src_len, Cfg *cfg, CfgError *err)
 }
 
 static char *
-read_file(const char *filename, int *count, char *err)
+read_file(Cfg *cfg, const char *filename, int *count, char *err)
 {
     FILE *file = fopen(filename, "rb");
     if (!file) {
@@ -497,27 +512,17 @@ read_file(const char *filename, int *count, char *err)
         return NULL;
     }
 
-    fseek(file, 0, SEEK_END);
-    size_t file_size = (size_t) ftell(file);
-    rewind(file);
-
-    char *src = malloc(file_size + 1);
-    if (src == NULL) {
-        snprintf(err, CFG_MAX_ERR, "memory allocation failed");
-        return NULL;
-    }
-
-    size_t bytes_read = fread(src, sizeof(char), file_size, file);
+    cfg->offset = fread(cfg->arena, sizeof(char), cfg->capacity, file);
+    bool failed = ferror(file);
     fclose(file);
 
-    if (bytes_read != file_size) {
-        free(src);
+    if (failed) {
         snprintf(err, CFG_MAX_ERR, "failed to read file");
         return NULL;
     }
 
-    *count = file_size;
-    return src;
+    *count = cfg->offset;
+    return cfg->arena;
 }
 
 int
@@ -538,22 +543,21 @@ cfg_load(const char *filename, Cfg *cfg, CfgError *err)
     }
 
     int src_len;
-    char *src = read_file(filename, &src_len, err->msg);
+    char *src = read_file(cfg, filename, &src_len, err->msg);
     if (src == NULL)
         return -1;
 
     int res = cfg_parse(src, src_len, cfg, err);
 
-    free(src);
     return res;
 }
 
 static void *
 get_val(Cfg *cfg, const char *key, void *fallback, CfgValType type)
 {
-    for (int i = cfg->count - 1; i >= 0; i--) {
-        if (cfg->entries[i].type == type && !strcmp(key, cfg->entries[i].key))
-            return &(cfg->entries[i].val);
+    for (CfgEntry *entry = cfg->entries; entry; entry = entry->next) {
+        if (entry->type == type && !strcmp(key, entry->key))
+            return &(entry->val);
     }
     return fallback;
 }
@@ -561,7 +565,8 @@ get_val(Cfg *cfg, const char *key, void *fallback, CfgValType type)
 char *
 cfg_get_string(Cfg *cfg, const char *key, char *fallback)
 {
-    return (char *) get_val(cfg, key, fallback, CFG_TYPE_STRING);
+    char **fallbackp = &fallback;
+    return *(char **) get_val(cfg, key, fallbackp, CFG_TYPE_STRING);
 }
 
 bool
@@ -649,25 +654,25 @@ cfg_get_color(Cfg *cfg, const char *key, CfgColor fallback)
 void
 cfg_fprint(FILE *stream, Cfg *cfg)
 {
-    for (int i = 0; i < cfg->count; i++) {
-        fprintf(stream, "%s: ", cfg->entries[i].key);
+    for (CfgEntry *entry = cfg->entries; entry; entry = entry->next) {
+        fprintf(stream, "%s: ", entry->key);
 
-        switch (cfg->entries[i].type) {
+        switch (entry->type) {
         case CFG_TYPE_STRING:
-            fprintf(stream, "\"%s\"\n", cfg->entries[i].val.string);
+            fprintf(stream, "\"%s\"\n", entry->val.string);
             break;
         case CFG_TYPE_BOOL:
             fprintf(stream, "%s\n",
-                    cfg->entries[i].val.boolean ? "true" : "false");
+                    entry->val.boolean ? "true" : "false");
             break;
         case CFG_TYPE_INT:
-            fprintf(stream, "%d\n", cfg->entries[i].val.integer);
+            fprintf(stream, "%d\n", entry->val.integer);
             break;
         case CFG_TYPE_FLOAT:
-            fprintf(stream, "%f\n", cfg->entries[i].val.floating);
+            fprintf(stream, "%f\n", entry->val.floating);
             break;
         case CFG_TYPE_COLOR:;
-            CfgColor c = cfg->entries[i].val.color;
+            CfgColor c = entry->val.color;
             fprintf(stream, "rgba(%d, %d, %d, %d)\n", c.r, c.g, c.b, c.a);
             break;
         }

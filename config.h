@@ -7,8 +7,6 @@
 
 #define CFG_FILE_EXT ".cfg"
 
-#define CFG_MAX_KEY 32
-#define CFG_MAX_VAL 64
 #define CFG_MAX_ERR 64
 
 typedef struct {
@@ -34,23 +32,25 @@ typedef enum {
 } CfgValType;
 
 typedef union {
-    char string[CFG_MAX_VAL + 1];
+    char *string;
     bool boolean;
     int integer;
     float floating;
     CfgColor color;
 } CfgVal;
 
-typedef struct {
+typedef struct CfgEntry {
+    struct CfgEntry *next;
     CfgValType type;
-    char key[CFG_MAX_KEY + 1];
+    char *key;
     CfgVal val;
 } CfgEntry;
 
 typedef struct {
     CfgEntry *entries;
-    int count;
+    void *arena;
     int capacity;
+    int offset;
 } Cfg;
 
 /**

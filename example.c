@@ -12,20 +12,20 @@ main(int argc, char *argv[])
         return 1;
     }
 
-    int capacity = 64;
-    CfgEntry *entries = malloc(capacity * sizeof(CfgEntry));
-    if (entries == NULL) {
+    int capacity = 4096;
+    char *arena = malloc(capacity);
+    if (arena == NULL) {
         fprintf(stderr, "Error: memory allocation failed\n");
         return 1;
     }
 
     CfgError err;
-    Cfg cfg = {.entries = entries, .capacity = capacity};
+    Cfg cfg = {.arena = arena, .capacity = capacity};
     int res = cfg_load(argv[1], &cfg, &err);
 
     if (res != 0) {
         cfg_fprint_error(stderr, &err);
-        free(entries);
+        free(arena);
         return 1;
     }
 
@@ -49,6 +49,6 @@ main(int argc, char *argv[])
 
     // cfg_fprint(stdout, &cfg);
 
-    free(entries);
+    free(arena);
     return 0;
 }
