@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <ctype.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -209,8 +210,12 @@ consume_number(Scanner *s, float *number, bool *is_int)
     if (!is_at_end(s) && !isdigit(peek(s)))
         return -1;
 
-    while (!is_at_end(s) && isdigit(peek(s)))
-        int_part = int_part * 10 + (advance(s) - '0');
+    while (!is_at_end(s) && isdigit(peek(s))) {
+        int digit = advance(s) - '0';
+        if (int_part > (INT_MAX - digit) / 10)
+            return -1;  // overflow
+        int_part = int_part * 10 + digit;
+    }
 
     if (!is_at_end(s) && peek(s) == '.') {
         advance(s);
@@ -223,7 +228,12 @@ consume_number(Scanner *s, float *number, bool *is_int)
     } else {
         int div = 1;
         while (!is_at_end(s) && isdigit(peek(s))) {
-            fract_part = fract_part * 10 + (advance(s) - '0');
+            int digit = advance(s) - '0';
+            if (digit > (INT_MAX - digit) / 10)
+                return -1;  // overflow
+            fract_part = fract_part * 10 + digit;
+            if (div > INT_MAX / 10)
+                return -1;  // overflow
             div *= 10;
         }
         float floating = int_part + (fract_part / div);
