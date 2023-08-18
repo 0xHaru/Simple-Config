@@ -206,7 +206,7 @@ parse_string(Cfg *cfg, Scanner *s, CfgEntry *entry, CfgError *err)
 }
 
 static int
-consume_number(Scanner *s, float *number, bool *is_int)
+consume_number(Scanner *s, float *number, bool *is_int, CfgError *err)
 {
     bool is_float = false;
     int sign = 1;
@@ -220,12 +220,12 @@ consume_number(Scanner *s, float *number, bool *is_int)
     }
 
     if (!is_at_end(s) && !isdigit(peek(s)))
-        return -1;
+        return error(s, err, "number expected");
 
     while (!is_at_end(s) && isdigit(peek(s))) {
         int digit = advance(s) - '0';
         if (int_part > (INT_MAX - digit) / 10)
-            return -1;  // overflow
+            return error(s, err, "number too large");
         int_part = int_part * 10 + digit;
     }
 
@@ -242,10 +242,10 @@ consume_number(Scanner *s, float *number, bool *is_int)
         while (!is_at_end(s) && isdigit(peek(s))) {
             int digit = advance(s) - '0';
             if (digit > (INT_MAX - digit) / 10)
-                return -1;  // overflow
+                return error(s, err, "number too large");
             fract_part = fract_part * 10 + digit;
             if (div > INT_MAX / 10)
-                return -1;  // overflow
+                return error(s, err, "number too large");
             div *= 10;
         }
         float floating = int_part + (fract_part / div);
@@ -261,8 +261,8 @@ parse_number(Scanner *s, CfgEntry *entry, CfgError *err)
 {
     bool is_int;
     float number;
-    if (consume_number(s, &number, &is_int) != 0)
-        return error(s, err, "number expected");
+    if (consume_number(s, &number, &is_int, err) != 0)
+        return -1;
 
     if (is_int) {
         entry->val.integer = (int) number;
@@ -300,8 +300,8 @@ parse_rgba(Scanner *s, CfgEntry *entry, CfgError *err)
         skip_blank(s);
 
         float number;
-        if (consume_number(s, &number, &is_int) != 0)
-            return error(s, err, "number expected");
+        if (consume_number(s, &number, &is_int, err) != 0)
+            return -1;
 
         if (!is_int || number < 0 || number > 255)
             return error(s, err,
@@ -324,8 +324,8 @@ parse_rgba(Scanner *s, CfgEntry *entry, CfgError *err)
     skip_blank(s);
 
     float alpha;
-    if (consume_number(s, &alpha, &is_int) != 0)
-        return error(s, err, "number expected");
+    if (consume_number(s, &alpha, &is_int, err) != 0)
+        return -1;
 
     if (alpha < 0 || alpha > 1)
         return error(s, err, "alpha must be in range (0, 1)");
@@ -552,6 +552,19 @@ cfg_load(const char *filename, Cfg *cfg, CfgError *err)
     return res;
 }
 
+long
+cfg_file_size(const char *filename, CfgError *err)
+{
+    FILE *file = fopen(filename, "rb");
+    if (!file) {
+        snprintf(err->msg, CFG_MAX_ERR, "failed to open file");
+        return -1;
+    }
+
+    fseek(file, 0, SEEK_END);
+    return ftell(file);
+}
+
 static void *
 get_val(Cfg *cfg, const char *key, void *fallback, CfgValType type)
 {
@@ -651,30 +664,43 @@ cfg_get_color(Cfg *cfg, const char *key, CfgColor fallback)
     return *(CfgColor *) get_val(cfg, key, &fallback, CFG_TYPE_COLOR);
 }
 
+static void
+fprint_entry(FILE *stream, CfgEntry *entry)
+{
+    fprintf(stream, "%s: ", entry->key);
+
+    switch (entry->type) {
+    case CFG_TYPE_STRING:
+        fprintf(stream, "\"%s\"\n", entry->val.string);
+        break;
+    case CFG_TYPE_BOOL:
+        fprintf(stream, "%s\n", entry->val.boolean ? "true" : "false");
+        break;
+    case CFG_TYPE_INT:
+        fprintf(stream, "%d\n", entry->val.integer);
+        break;
+    case CFG_TYPE_FLOAT:
+        fprintf(stream, "%f\n", entry->val.floating);
+        break;
+    case CFG_TYPE_COLOR:;
+        CfgColor c = entry->val.color;
+        fprintf(stream, "rgba(%d, %d, %d, %d)\n", c.r, c.g, c.b, c.a);
+        break;
+    }
+}
+
+static void
+fprint_entries(FILE *stream, CfgEntry *head)
+{
+    if (head == NULL)
+        return;
+
+    fprint_entries(stream, head->next);
+    fprint_entry(stream, head);
+}
+
 void
 cfg_fprint(FILE *stream, Cfg *cfg)
 {
-    for (CfgEntry *entry = cfg->entries; entry; entry = entry->next) {
-        fprintf(stream, "%s: ", entry->key);
-
-        switch (entry->type) {
-        case CFG_TYPE_STRING:
-            fprintf(stream, "\"%s\"\n", entry->val.string);
-            break;
-        case CFG_TYPE_BOOL:
-            fprintf(stream, "%s\n",
-                    entry->val.boolean ? "true" : "false");
-            break;
-        case CFG_TYPE_INT:
-            fprintf(stream, "%d\n", entry->val.integer);
-            break;
-        case CFG_TYPE_FLOAT:
-            fprintf(stream, "%f\n", entry->val.floating);
-            break;
-        case CFG_TYPE_COLOR:;
-            CfgColor c = entry->val.color;
-            fprintf(stream, "rgba(%d, %d, %d, %d)\n", c.r, c.g, c.b, c.a);
-            break;
-        }
-    }
+    fprint_entries(stream, cfg->entries);
 }

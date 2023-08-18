@@ -78,6 +78,8 @@ int cfg_parse(const char *src, int src_len, Cfg *cfg, CfgError *err);
  */
 int cfg_load(const char *filename, Cfg *cfg, CfgError *err);
 
+long cfg_file_size(const char *filename, CfgError *err);
+
 char *cfg_get_string(Cfg *cfg, const char *key, char *fallback);
 bool cfg_get_bool(Cfg *cfg, const char *key, bool fallback);
 int cfg_get_int(Cfg *cfg, const char *key, int fallback);
