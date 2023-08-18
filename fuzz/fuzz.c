@@ -6,16 +6,18 @@
 int
 LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
 {
-    int capacity = 64;
-    CfgEntry *entries = malloc(capacity * sizeof(CfgEntry));
-    if (entries == NULL)
+    int capacity = 8192;
+    char *arena = malloc(capacity);
+    if (arena == NULL) {
+        fprintf(stderr, "Error: memory allocation failed\n");
         return 1;
+    }
 
     CfgError err;
-    Cfg cfg = {.entries = entries, .capacity = capacity};
+    Cfg cfg = {.arena = arena, .capacity = capacity};
     int res = cfg_parse(Data, Size, &cfg, &err);
 
-    free(entries);
+    free(arena);
     return 0;
 }
 
