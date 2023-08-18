@@ -58,8 +58,8 @@ static char
 advance2(Scanner *s, int n)
 {
     for (int i = 0; i < n - 1; i++)
-        advance(s);
-    return advance(s);
+        s->cur++;
+    return s->src[s->cur++];
 }
 
 static void
@@ -536,7 +536,7 @@ cfg_load(const char *filename, Cfg *cfg, CfgError *err)
         return -1;
     }
 
-    const char *ext = filename + (len - strlen(CFG_FILE_EXT));
+    const char *ext = filename + (len - (sizeof(CFG_FILE_EXT) - 1));
     if (strcmp(ext, CFG_FILE_EXT) != 0) {
         snprintf(err->msg, CFG_MAX_ERR, "invalid file extension");
         return -1;
