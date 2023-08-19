@@ -9,6 +9,14 @@
 #include "config.h"
 
 typedef struct {
+    enum { TYPE_INT, TYPE_FLOAT } type;
+    union {
+        int integer;
+        float floating;
+    } val;
+} Number;
+
+typedef struct {
     const char *src;
     int len;
     int cur;
@@ -206,12 +214,12 @@ parse_string(Cfg *cfg, Scanner *s, CfgEntry *entry, CfgError *err)
 }
 
 static int
-consume_number(Scanner *s, float *number, bool *is_int, CfgError *err)
+consume_number(Scanner *s, Number *number, CfgError *err)
 {
     bool is_float = false;
     int sign = 1;
     int int_part = 0;
-    float fract_part = 0;
+    int fract_part = 0;
 
     if (!is_at_end(s) && peek(s) == '-' && isdigit(peek_next(s))) {
         // Consume '-'
@@ -235,22 +243,26 @@ consume_number(Scanner *s, float *number, bool *is_int, CfgError *err)
     }
 
     if (!is_float) {
-        *is_int = true;
-        *number = sign * int_part;
+        *number = (Number){
+            .type = TYPE_INT,
+            .val.integer = sign * int_part,
+        };
     } else {
         int div = 1;
         while (!is_at_end(s) && isdigit(peek(s))) {
             int digit = advance(s) - '0';
-            if (digit > (INT_MAX - digit) / 10)
+            if (fract_part > (INT_MAX - digit) / 10)
                 return error(s, err, "number too large");
             fract_part = fract_part * 10 + digit;
             if (div > INT_MAX / 10)
                 return error(s, err, "number too large");
             div *= 10;
         }
-        float floating = int_part + (fract_part / div);
-        *is_int = false;
-        *number = sign * floating;
+        float floating = int_part + ((float) fract_part / div);
+        *number = (Number){
+            .type = TYPE_FLOAT,
+            .val.floating = sign * floating,
+        };
     }
 
     return 0;
@@ -259,16 +271,15 @@ consume_number(Scanner *s, float *number, bool *is_int, CfgError *err)
 static int
 parse_number(Scanner *s, CfgEntry *entry, CfgError *err)
 {
-    bool is_int;
-    float number;
-    if (consume_number(s, &number, &is_int, err) != 0)
+    Number number;
+    if (consume_number(s, &number, err) != 0)
         return -1;
 
-    if (is_int) {
-        entry->val.integer = (int) number;
+    if (number.type == TYPE_INT) {
+        entry->val.integer = number.val.integer;
         entry->type = CFG_TYPE_INT;
     } else {
-        entry->val.floating = number;
+        entry->val.floating = number.val.floating;
         entry->type = CFG_TYPE_FLOAT;
     }
 
@@ -293,22 +304,22 @@ parse_rgba(Scanner *s, CfgEntry *entry, CfgError *err)
     // Consume '('
     advance(s);
 
-    bool is_int;
     uint8_t rgb[3];
     for (int i = 0; i < 3; i++) {
         // Skip blank space preceding the number
         skip_blank(s);
 
-        float number;
-        if (consume_number(s, &number, &is_int, err) != 0)
+        Number number;
+        if (consume_number(s, &number, err) != 0)
             return -1;
 
-        if (!is_int || number < 0 || number > 255)
+        if (number.type != TYPE_INT || number.val.integer < 0 ||
+            number.val.integer > 255)
             return error(s, err,
                          "red, blue and green must be "
                          "integers in range (0, 255)");
 
-        rgb[i] = (uint8_t) number;
+        rgb[i] = (uint8_t) number.val.integer;
 
         // Skip blank space following the number
         skip_blank(s);
@@ -323,12 +334,34 @@ parse_rgba(Scanner *s, CfgEntry *entry, CfgError *err)
     // Skip blank space preceding the number
     skip_blank(s);
 
-    float alpha;
-    if (consume_number(s, &alpha, &is_int, err) != 0)
+    Number alpha;
+    CfgColor color;
+    if (consume_number(s, &alpha, err) != 0)
         return -1;
 
-    if (alpha < 0 || alpha > 1)
-        return error(s, err, "alpha must be in range (0, 1)");
+    if (alpha.type == TYPE_INT) {
+        int integer = alpha.val.integer;
+        if (integer < 0 || integer > 1)
+            return error(s, err, "alpha must be in range (0, 1)");
+
+        color = (CfgColor){
+            .r = rgb[0],
+            .g = rgb[1],
+            .b = rgb[2],
+            .a = (uint8_t) (integer * 255),
+        };
+    } else {
+        float floating = alpha.val.floating;
+        if (floating < 0 || floating > 1)
+            return error(s, err, "alpha must be in range (0, 1)");
+
+        color = (CfgColor){
+            .r = rgb[0],
+            .g = rgb[1],
+            .b = rgb[2],
+            .a = (uint8_t) (floating * 255),
+        };
+    }
 
     // Skip blank space following the number
     skip_blank(s);
@@ -339,12 +372,6 @@ parse_rgba(Scanner *s, CfgEntry *entry, CfgError *err)
     // Consume ')'
     advance(s);
 
-    CfgColor color = {
-        .r = rgb[0],
-        .g = rgb[1],
-        .b = rgb[2],
-        .a = (uint8_t) (alpha * 255),
-    };
     entry->val.color = color;
     entry->type = CFG_TYPE_COLOR;
     return 0;
