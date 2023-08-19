@@ -393,6 +393,18 @@ static const TestCase test_cases[] = {
         .src = "key: rgba(255, 255, 255, -0.5)",
         .expected_error = "alpha must be in range (0, 1)",
     },
+    {
+        .type = TC_ERR,
+        .line = __LINE__,
+        .src = "key: rgba(255, 255, 255, -)",
+        .expected_error = "number expected",
+    },
+    {
+        .type = TC_ERR,
+        .line = __LINE__,
+        .src = "key: 2147483648.",
+        .expected_error = "number too large",
+    },
 };
 
 static TestResult
@@ -452,9 +464,9 @@ run_test_case(TestCase tc)
     Cfg cfg = {.arena = arena, .capacity = TEST_CAPACITY};
     int res = cfg_parse(tc.src, strlen(tc.src), &cfg, &err);
 
-    printf("%s:%d\n", __FILE__, tc.line);
-    cfg_fprint(stdout, &cfg);
-    cfg_fprint_error(stdout, &err);
+    // printf("%s:%d\n", __FILE__, tc.line);
+    // cfg_fprint(stdout, &cfg);
+    // cfg_fprint_error(stdout, &err);
 
     switch (tc.type) {
     case TC_SUCC:

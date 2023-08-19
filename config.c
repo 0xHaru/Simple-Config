@@ -42,6 +42,12 @@ cur(Scanner *s)
     return s->cur;
 }
 
+static void
+set_cur(Scanner *s, int n)
+{
+    s->cur = n;
+}
+
 static char
 peek(Scanner *s)
 {
@@ -214,9 +220,35 @@ parse_string(Cfg *cfg, Scanner *s, CfgEntry *entry, CfgError *err)
 }
 
 static int
-consume_number(Scanner *s, Number *number, CfgError *err)
+consume_int(Scanner *s, int *number, CfgError *err)
 {
-    bool is_float = false;
+    int sign = 1;
+    int num = 0;
+
+    if (!is_at_end(s) && peek(s) == '-' && isdigit(peek_next(s))) {
+        // Consume '-'
+        advance(s);
+        sign = -1;
+    }
+
+    if (!is_at_end(s) && !isdigit(peek(s)))
+        return error(s, err, "number expected");
+
+    while (!is_at_end(s) && isdigit(peek(s))) {
+        int digit = advance(s) - '0';
+        if (num > (INT_MAX - digit) / 10)
+            return error(s, err, "number too large");
+
+        num = num * 10 + digit;
+    }
+
+    *number = sign * num;
+    return 0;
+}
+
+static int
+consume_float(Scanner *s, float *number, CfgError *err)
+{
     int sign = 1;
     int int_part = 0;
     int fract_part = 0;
@@ -237,52 +269,67 @@ consume_number(Scanner *s, Number *number, CfgError *err)
         int_part = int_part * 10 + digit;
     }
 
-    if (!is_at_end(s) && peek(s) == '.') {
-        advance(s);
-        is_float = true;
+    if (!is_at_end(s) && peek(s) != '.')
+        return error(s, err, "float expected");
+
+    // Consume '.'
+    advance(s);
+
+    int div = 1;
+    while (!is_at_end(s) && isdigit(peek(s))) {
+        int digit = advance(s) - '0';
+        if (fract_part > (INT_MAX - digit) / 10)
+            return error(s, err, "number too large");
+
+        fract_part = fract_part * 10 + digit;
+        if (div > INT_MAX / 10)
+            return error(s, err, "number too large");
+
+        div *= 10;
     }
 
-    if (!is_float) {
-        *number = (Number){
-            .type = TYPE_INT,
-            .val.integer = sign * int_part,
-        };
-    } else {
-        int div = 1;
-        while (!is_at_end(s) && isdigit(peek(s))) {
-            int digit = advance(s) - '0';
-            if (fract_part > (INT_MAX - digit) / 10)
-                return error(s, err, "number too large");
-            fract_part = fract_part * 10 + digit;
-            if (div > INT_MAX / 10)
-                return error(s, err, "number too large");
-            div *= 10;
-        }
-        float floating = int_part + ((float) fract_part / div);
-        *number = (Number){
-            .type = TYPE_FLOAT,
-            .val.floating = sign * floating,
-        };
-    }
-
+    float floating = int_part + ((float) fract_part / div);
+    *number = sign * floating;
     return 0;
+}
+
+static bool
+match_float(Scanner *s)
+{
+    int restore = cur(s);
+    bool is_float = false;
+
+    if (!is_at_end(s) && peek(s) == '-' && isdigit(peek_next(s)))
+        advance(s);  // Consume '-'
+
+    while (!is_at_end(s) && isdigit(peek(s)))
+        advance(s);
+
+    if (!is_at_end(s) && peek(s) == '.')
+        is_float = true;
+
+    set_cur(s, restore);
+    return is_float;
 }
 
 static int
 parse_number(Scanner *s, CfgEntry *entry, CfgError *err)
 {
-    Number number;
-    if (consume_number(s, &number, err) != 0)
-        return -1;
+    if (match_float(s)) {
+        float number;
+        if (consume_float(s, &number, err) != 0)
+            return -1;
 
-    if (number.type == TYPE_INT) {
-        entry->val.integer = number.val.integer;
-        entry->type = CFG_TYPE_INT;
-    } else {
-        entry->val.floating = number.val.floating;
+        entry->val.floating = number;
         entry->type = CFG_TYPE_FLOAT;
-    }
+    } else {
+        int number;
+        if (consume_int(s, &number, err) != 0)
+            return -1;
 
+        entry->val.integer = number;
+        entry->type = CFG_TYPE_INT;
+    }
     return 0;
 }
 
@@ -309,17 +356,21 @@ parse_rgba(Scanner *s, CfgEntry *entry, CfgError *err)
         // Skip blank space preceding the number
         skip_blank(s);
 
-        Number number;
-        if (consume_number(s, &number, err) != 0)
-            return -1;
-
-        if (number.type != TYPE_INT || number.val.integer < 0 ||
-            number.val.integer > 255)
+        if (match_float(s))
             return error(s, err,
                          "red, blue and green must be "
                          "integers in range (0, 255)");
 
-        rgb[i] = (uint8_t) number.val.integer;
+        int number;
+        if (consume_int(s, &number, err) != 0)
+            return -1;
+
+        if (number < 0 || number > 255)
+            return error(s, err,
+                         "red, blue and green must be "
+                         "integers in range (0, 255)");
+
+        rgb[i] = (uint8_t) number;
 
         // Skip blank space following the number
         skip_blank(s);
@@ -334,32 +385,34 @@ parse_rgba(Scanner *s, CfgEntry *entry, CfgError *err)
     // Skip blank space preceding the number
     skip_blank(s);
 
-    Number alpha;
     CfgColor color;
-    if (consume_number(s, &alpha, err) != 0)
-        return -1;
+    if (match_float(s)) {
+        float number;
+        if (consume_float(s, &number, err) != 0)
+            return -1;
 
-    if (alpha.type == TYPE_INT) {
-        int integer = alpha.val.integer;
-        if (integer < 0 || integer > 1)
+        if (number < 0 || number > 1)
             return error(s, err, "alpha must be in range (0, 1)");
 
         color = (CfgColor){
             .r = rgb[0],
             .g = rgb[1],
             .b = rgb[2],
-            .a = (uint8_t) (integer * 255),
+            .a = (uint8_t) (number * 255),
         };
     } else {
-        float floating = alpha.val.floating;
-        if (floating < 0 || floating > 1)
+        int number;
+        if (consume_int(s, &number, err) != 0)
+            return -1;
+
+        if (number < 0 || number > 1)
             return error(s, err, "alpha must be in range (0, 1)");
 
         color = (CfgColor){
             .r = rgb[0],
             .g = rgb[1],
             .b = rgb[2],
-            .a = (uint8_t) (floating * 255),
+            .a = (uint8_t) (number * 255),
         };
     }
 
