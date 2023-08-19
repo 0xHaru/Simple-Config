@@ -19,15 +19,16 @@ bg.color: rgba(255, 255, 255, 1)
 int
 main(void)
 {
-    CfgError err;
-    CfgEntry *entries = malloc(64 * sizeof(CfgEntry));
-    Cfg cfg = {.entries = entries, .capacity = 64};
+    int capacity = 4096;
+    char *arena = malloc(capacity);
 
+    CfgError err;
+    Cfg cfg = {.arena = arena, .capacity = capacity};
     int res = cfg_load("sample.cfg", &cfg, &err);
 
     if (res != 0) {
         cfg_fprint_error(stderr, &err);
-        free(entries);
+        free(arena);
         return 1;
     }
 
@@ -46,7 +47,7 @@ main(void)
                                           .a = 1,
                                       });
 
-    free(entries);
+    free(arena);
     return 0;
 }
 ```
