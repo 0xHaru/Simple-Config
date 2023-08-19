@@ -118,14 +118,14 @@ static const TestCase test_cases[] = {
     {
         .type = TC_SUCC,
         .line = __LINE__,
-        .src = "key: rgba(255, 255, 255, 1)",
+        .src = "key: rgba(255, 255, 255, 0.5)",
         .capacity = TEST_CAPACITY,
         .expected_entries =
             (CfgEntry[]){
                 {.key = "key",
                  .type = CFG_TYPE_COLOR,
                  .val.color =
-                     (CfgColor){.r = 255, .g = 255, .b = 255, .a = 255}},
+                     (CfgColor){.r = 255, .g = 255, .b = 255, .a = 127}},
             },
         .expected_count = 1,
     },
@@ -182,20 +182,6 @@ static const TestCase test_cases[] = {
         .expected_entries =
             (CfgEntry[]){
                 {.key = "key", .type = CFG_TYPE_FLOAT, .val.floating = 1.0},
-            },
-        .expected_count = 1,
-    },
-    {
-        .type = TC_SUCC,
-        .line = __LINE__,
-        .src = "key: rgba(255, 255, 255, 0.5)",
-        .capacity = TEST_CAPACITY,
-        .expected_entries =
-            (CfgEntry[]){
-                {.key = "key",
-                 .type = CFG_TYPE_COLOR,
-                 .val.color =
-                     (CfgColor){.r = 255, .g = 255, .b = 255, .a = 127}},
             },
         .expected_count = 1,
     },
