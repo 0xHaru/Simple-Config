@@ -100,19 +100,19 @@ run_get_tests(Scoreboard *sb, FILE *stream)
 {
     TestResult result;
 
-    result = run_get_int_test();
-    update_scoreboard(sb, result);
-    log_result(result, stream);
-
-    result = run_get_float_test();
-    update_scoreboard(sb, result);
-    log_result(result, stream);
-
     result = run_get_str_test();
     update_scoreboard(sb, result);
     log_result(result, stream);
 
     result = run_get_bool_test();
+    update_scoreboard(sb, result);
+    log_result(result, stream);
+
+    result = run_get_int_test();
+    update_scoreboard(sb, result);
+    log_result(result, stream);
+
+    result = run_get_float_test();
     update_scoreboard(sb, result);
     log_result(result, stream);
 

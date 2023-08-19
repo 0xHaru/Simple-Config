@@ -57,8 +57,8 @@ static char
 advance2(Scanner *s, int n)
 {
     for (int i = 0; i < n - 1; i++)
-        advance(s);
-    return advance(s);
+        s->cur++;
+    return s->src[s->cur++];
 }
 
 static void

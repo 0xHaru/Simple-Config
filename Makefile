@@ -15,7 +15,7 @@ example: example.c $(CFG_SRC_HDR)
 	$(CC) example.c config.c -o $@ $(CFLAGS) -Wpedantic
 
 fzz: $(FZZ_SRC) $(CFG_SRC_HDR)
-	clang $(FZZ_SRC) config.c -o $@ -g -fsanitize=fuzzer,address,undefined -O1
+	clang $(FZZ_SRC) config.c -o $@ -g -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=all -O1
 
 tst: $(TST_SRC) $(TST_HDR) $(CFG_SRC_HDR)
 	$(CC) $(TST_SRC) config.c -o $@ $(CFLAGS)
@@ -32,7 +32,7 @@ report: clean tst-cov
 clean:
 	rm -rf example fzz tst tst-cov \
 	       tst-cov-*.gcda tst-cov-*.gcno coverage.info \
-		   log.txt report/
+		   log.txt report/ crash-*
 
 	find ./fuzz/corpus -type f ! -name '*.cfg' -delete
 
