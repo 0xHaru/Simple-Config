@@ -9,14 +9,6 @@
 #include "config.h"
 
 typedef struct {
-    enum { TYPE_INT, TYPE_FLOAT } type;
-    union {
-        int integer;
-        float floating;
-    } val;
-} Number;
-
-typedef struct {
     const char *src;
     int len;
     int cur;
