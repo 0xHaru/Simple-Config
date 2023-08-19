@@ -15,7 +15,7 @@
 #define RESET "\e[0m"
 #endif
 
-#define TEST_CAPACITY 32
+#define TEST_CAPACITY 1024
 
 typedef struct {
     int passed;
@@ -48,12 +48,6 @@ typedef struct {
 #define OK (TestResult) {.type=TEST_PASSED, .file=__FILE__, .line=__LINE__}
 
 #define COUNT_OF(X) (sizeof(X) / sizeof((X)[0]))
-
-#define WRAP(E) (Cfg) {        \
-        .entries=(E),          \
-        .capacity=COUNT_OF(E), \
-        .count=COUNT_OF(E)     \
-    }
 // clang-format on
 
 void log_result(TestResult result, FILE *stream);

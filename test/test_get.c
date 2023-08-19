@@ -6,11 +6,21 @@
 static TestResult
 run_get_str_test(void)
 {
-    CfgEntry entries[] = {
-        {.key = "keyA", .type = CFG_TYPE_STRING, .val.string = "foobar"},
-        {.key = "keyC", .type = CFG_TYPE_BOOL, .val.boolean = true},
+    CfgEntry entry2 = {
+        .next = NULL,
+        .key = "keyA",
+        .type = CFG_TYPE_STRING,
+        .val.string = "foobar",
     };
-    Cfg cfg = WRAP(entries);
+
+    CfgEntry entry1 = {
+        .next = &entry2,
+        .key = "keyA",
+        .type = CFG_TYPE_STRING,
+        .val.string = "foobar",
+    };
+
+    Cfg cfg = {.entries = &entry1};
 
     ASSERT(0 == strcmp("foobar", cfg_get_string(&cfg, "keyA", "barfoo")));
     ASSERT(0 == strcmp("barfoo", cfg_get_string(&cfg, "keyB", "barfoo")));
@@ -22,23 +32,30 @@ run_get_str_test(void)
 static TestResult
 run_get_bool_test(void)
 {
-    CfgEntry entries[] = {
-        {.key = "key", .type = CFG_TYPE_BOOL, .val.boolean = true},
+    CfgEntry entry = {
+        .next = NULL,
+        .key = "key",
+        .type = CFG_TYPE_BOOL,
+        .val.boolean = true,
     };
-    Cfg cfg = WRAP(entries);
+
+    Cfg cfg = {.entries = &entry};
 
     ASSERT(true == cfg_get_bool(&cfg, "key", false));
-
     return OK;
 }
 
 static TestResult
 run_get_int_test(void)
 {
-    CfgEntry entries[] = {
-        {.key = "key", .type = CFG_TYPE_INT, .val.integer = 16},
+    CfgEntry entry = {
+        .next = NULL,
+        .key = "key",
+        .type = CFG_TYPE_INT,
+        .val.integer = 16,
     };
-    Cfg cfg = WRAP(entries);
+
+    Cfg cfg = {.entries = &entry};
 
     ASSERT(16 == cfg_get_int(&cfg, "key", 64));
 
@@ -58,10 +75,14 @@ run_get_int_test(void)
 static TestResult
 run_get_float_test(void)
 {
-    CfgEntry entries[] = {
-        {.key = "key", .type = CFG_TYPE_FLOAT, .val.floating = 16},
+    CfgEntry entry = {
+        .next = NULL,
+        .key = "key",
+        .type = CFG_TYPE_FLOAT,
+        .val.floating = 16,
     };
-    Cfg cfg = WRAP(entries);
+
+    Cfg cfg = {.entries = &entry};
 
     ASSERT(16 == cfg_get_float(&cfg, "key", 64));
 
@@ -84,10 +105,14 @@ run_get_color_test(void)
     CfgColor c1 = {.r = 255, .g = 255, .b = 255, .a = 255};
     CfgColor c2 = {.r = 0, .g = 0, .b = 0, .a = 0};
 
-    CfgEntry entries[] = {
-        {.key = "key", .type = CFG_TYPE_COLOR, .val.color = c1},
+    CfgEntry entry = {
+        .next = NULL,
+        .key = "key",
+        .type = CFG_TYPE_COLOR,
+        .val.color = c1,
     };
-    Cfg cfg = WRAP(entries);
+
+    Cfg cfg = {.entries = &entry};
 
     CfgColor actual = cfg_get_color(&cfg, "key", c2);
     ASSERT(0 == memcmp(&c1, &actual, sizeof(CfgColor)));
@@ -100,19 +125,19 @@ run_get_tests(Scoreboard *sb, FILE *stream)
 {
     TestResult result;
 
-    result = run_get_int_test();
-    update_scoreboard(sb, result);
-    log_result(result, stream);
-
-    result = run_get_float_test();
-    update_scoreboard(sb, result);
-    log_result(result, stream);
-
     result = run_get_str_test();
     update_scoreboard(sb, result);
     log_result(result, stream);
 
     result = run_get_bool_test();
+    update_scoreboard(sb, result);
+    log_result(result, stream);
+
+    result = run_get_int_test();
+    update_scoreboard(sb, result);
+    log_result(result, stream);
+
+    result = run_get_float_test();
     update_scoreboard(sb, result);
     log_result(result, stream);
 
