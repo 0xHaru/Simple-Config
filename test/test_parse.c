@@ -437,6 +437,55 @@ static const TestCase test_cases[] = {
         .capacity = TEST_CAPACITY,
         .expected_error = "')' expected",
     },
+    {
+        .type = TC_ERR,
+        .line = __LINE__,
+        .src = "key: 2147483648",
+        .capacity = TEST_CAPACITY,
+        .expected_error = "number too large",
+    },
+    {
+        .type = TC_ERR,
+        .line = __LINE__,
+        .src = "key: 0.0000000000",
+        .capacity = TEST_CAPACITY,
+        .expected_error = "number too large",
+    },
+    {
+        .type = TC_ERR,
+        .line = __LINE__,
+        .src = "key: 1.33333333333333333",
+        .capacity = TEST_CAPACITY,
+        .expected_error = "number too large",
+    },
+    {
+        .type = TC_ERR,
+        .line = __LINE__,
+        .src = "key: rgba(255, 255, 255, -0.5)",
+        .capacity = TEST_CAPACITY,
+        .expected_error = "alpha must be in range (0, 1)",
+    },
+    {
+        .type = TC_ERR,
+        .line = __LINE__,
+        .src = "key: rgba(255, 255, 255, -)",
+        .capacity = TEST_CAPACITY,
+        .expected_error = "number expected",
+    },
+    {
+        .type = TC_ERR,
+        .line = __LINE__,
+        .src = "key: rgba(255, 255, 255, 0.5)",
+        .capacity = TEST_CAPACITY,
+        .expected_error = "alpha must be in range (0, 1)",
+    },
+    {
+        .type = TC_ERR,
+        .line = __LINE__,
+        .src = "key: rgba(255, 255, 255, 1.5)",
+        .capacity = TEST_CAPACITY,
+        .expected_error = "alpha must be in range (0, 1)",
+    },
 };
 
 static TestResult

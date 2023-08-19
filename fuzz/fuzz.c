@@ -6,7 +6,7 @@
 int
 LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
 {
-    int capacity = 64;
+    int capacity = 512;
     CfgEntry *entries = malloc(capacity * sizeof(CfgEntry));
     if (entries == NULL)
         return 1;

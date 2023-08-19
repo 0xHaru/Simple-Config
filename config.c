@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <ctype.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,6 +32,12 @@ static int
 cur(Scanner *s)
 {
     return s->cur;
+}
+
+static void
+set_cur(Scanner *s, int n)
+{
+    s->cur = n;
 }
 
 static char
@@ -193,12 +200,10 @@ parse_string(Scanner *s, CfgEntry *entry, CfgError *err)
 }
 
 static int
-consume_number(Scanner *s, float *number, bool *is_int)
+consume_int(Scanner *s, int *number, CfgError *err)
 {
-    bool is_float = false;
     int sign = 1;
-    int int_part = 0;
-    float fract_part = 0;
+    int num = 0;
 
     if (!is_at_end(s) && peek(s) == '-' && isdigit(peek_next(s))) {
         // Consume '-'
@@ -207,49 +212,104 @@ consume_number(Scanner *s, float *number, bool *is_int)
     }
 
     if (!is_at_end(s) && !isdigit(peek(s)))
-        return -1;
+        return error(s, err, "number expected");
+
+    while (!is_at_end(s) && isdigit(peek(s))) {
+        int digit = advance(s) - '0';
+        if (num > (INT_MAX - digit) / 10)
+            return error(s, err, "number too large");
+
+        num = num * 10 + digit;
+    }
+
+    *number = sign * num;
+    return 0;
+}
+
+static int
+consume_float(Scanner *s, float *number, CfgError *err)
+{
+    int sign = 1;
+    int int_part = 0;
+    int fract_part = 0;
+
+    if (!is_at_end(s) && peek(s) == '-' && isdigit(peek_next(s))) {
+        // Consume '-'
+        advance(s);
+        sign = -1;
+    }
+
+    if (!is_at_end(s) && !isdigit(peek(s)))
+        return error(s, err, "number expected");
+
+    while (!is_at_end(s) && isdigit(peek(s))) {
+        int digit = advance(s) - '0';
+        if (int_part > (INT_MAX - digit) / 10)
+            return error(s, err, "number too large");
+        int_part = int_part * 10 + digit;
+    }
+
+    if (!is_at_end(s) && peek(s) != '.')
+        return error(s, err, "float expected");
+
+    // Consume '.'
+    advance(s);
+
+    int div = 1;
+    while (!is_at_end(s) && isdigit(peek(s))) {
+        int digit = advance(s) - '0';
+        if (fract_part > (INT_MAX - digit) / 10)
+            return error(s, err, "number too large");
+
+        fract_part = fract_part * 10 + digit;
+        if (div > INT_MAX / 10)
+            return error(s, err, "number too large");
+
+        div *= 10;
+    }
+
+    float floating = int_part + ((float) fract_part / div);
+    *number = sign * floating;
+    return 0;
+}
+
+static bool
+match_float(Scanner *s)
+{
+    int restore = cur(s);
+    bool is_float = false;
+
+    if (!is_at_end(s) && peek(s) == '-' && isdigit(peek_next(s)))
+        advance(s);  // Consume '-'
 
     while (!is_at_end(s) && isdigit(peek(s)))
-        int_part = int_part * 10 + (advance(s) - '0');
-
-    if (!is_at_end(s) && peek(s) == '.') {
         advance(s);
+
+    if (!is_at_end(s) && peek(s) == '.')
         is_float = true;
-    }
 
-    if (!is_float) {
-        *is_int = true;
-        *number = sign * int_part;
-    } else {
-        int div = 1;
-        while (!is_at_end(s) && isdigit(peek(s))) {
-            fract_part = fract_part * 10 + (advance(s) - '0');
-            div *= 10;
-        }
-        float floating = int_part + (fract_part / div);
-        *is_int = false;
-        *number = sign * floating;
-    }
-
-    return 0;
+    set_cur(s, restore);
+    return is_float;
 }
 
 static int
 parse_number(Scanner *s, CfgEntry *entry, CfgError *err)
 {
-    bool is_int;
-    float number;
-    if (consume_number(s, &number, &is_int) != 0)
-        return error(s, err, "number expected");
+    if (match_float(s)) {
+        float number;
+        if (consume_float(s, &number, err) != 0)
+            return -1;
 
-    if (is_int) {
-        entry->val.integer = (int) number;
-        entry->type = CFG_TYPE_INT;
-    } else {
         entry->val.floating = number;
         entry->type = CFG_TYPE_FLOAT;
-    }
+    } else {
+        int number;
+        if (consume_int(s, &number, err) != 0)
+            return -1;
 
+        entry->val.integer = number;
+        entry->type = CFG_TYPE_INT;
+    }
     return 0;
 }
 
@@ -271,17 +331,21 @@ parse_rgba(Scanner *s, CfgEntry *entry, CfgError *err)
     // Consume '('
     advance(s);
 
-    bool is_int;
     uint8_t rgb[3];
     for (int i = 0; i < 3; i++) {
         // Skip blank space preceding the number
         skip_blank(s);
 
-        float number;
-        if (consume_number(s, &number, &is_int) != 0)
-            return error(s, err, "number expected");
+        if (match_float(s))
+            return error(s, err,
+                         "red, blue and green must be "
+                         "integers in range (0, 255)");
 
-        if (!is_int || number < 0 || number > 255)
+        int number;
+        if (consume_int(s, &number, err) != 0)
+            return -1;
+
+        if (number < 0 || number > 255)
             return error(s, err,
                          "red, blue and green must be "
                          "integers in range (0, 255)");
@@ -301,12 +365,36 @@ parse_rgba(Scanner *s, CfgEntry *entry, CfgError *err)
     // Skip blank space preceding the number
     skip_blank(s);
 
-    float alpha;
-    if (consume_number(s, &alpha, &is_int) != 0)
-        return error(s, err, "number expected");
+    CfgColor color;
+    if (match_float(s)) {
+        float number;
+        if (consume_float(s, &number, err) != 0)
+            return -1;
 
-    if (alpha < 0 || alpha > 1)
-        return error(s, err, "alpha must be in range (0, 1)");
+        if (number < 0 || number > 1)
+            return error(s, err, "alpha must be in range (0, 1)");
+
+        color = (CfgColor){
+            .r = rgb[0],
+            .g = rgb[1],
+            .b = rgb[2],
+            .a = (uint8_t) (number * 255),
+        };
+    } else {
+        int number;
+        if (consume_int(s, &number, err) != 0)
+            return -1;
+
+        if (number < 0 || number > 1)
+            return error(s, err, "alpha must be in range (0, 1)");
+
+        color = (CfgColor){
+            .r = rgb[0],
+            .g = rgb[1],
+            .b = rgb[2],
+            .a = (uint8_t) (number * 255),
+        };
+    }
 
     // Skip blank space following the number
     skip_blank(s);
@@ -317,12 +405,6 @@ parse_rgba(Scanner *s, CfgEntry *entry, CfgError *err)
     // Consume ')'
     advance(s);
 
-    CfgColor color = {
-        .r = rgb[0],
-        .g = rgb[1],
-        .b = rgb[2],
-        .a = (uint8_t) (alpha * 255),
-    };
     entry->val.color = color;
     entry->type = CFG_TYPE_COLOR;
     return 0;
@@ -521,7 +603,7 @@ cfg_load(const char *filename, Cfg *cfg, CfgError *err)
         return -1;
     }
 
-    const char *ext = filename + (len - strlen(CFG_FILE_EXT));
+    const char *ext = filename + (len - (sizeof(CFG_FILE_EXT) - 1));
     if (strcmp(ext, CFG_FILE_EXT) != 0) {
         snprintf(err->msg, CFG_MAX_ERR, "invalid file extension");
         return -1;
