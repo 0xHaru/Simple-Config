@@ -186,6 +186,20 @@ static const TestCase test_cases[] = {
         .expected_count = 1,
     },
     {
+        .type = TC_SUCC,
+        .line = __LINE__,
+        .src = "key: rgba(255, 255, 255, 0.5)",
+        .capacity = TEST_CAPACITY,
+        .expected_entries =
+            (CfgEntry[]){
+                {.key = "key",
+                 .type = CFG_TYPE_COLOR,
+                 .val.color =
+                     (CfgColor){.r = 255, .g = 255, .b = 255, .a = 127}},
+            },
+        .expected_count = 1,
+    },
+    {
         .type = TC_ERR,
         .line = __LINE__,
         .src = "!",
@@ -471,13 +485,6 @@ static const TestCase test_cases[] = {
         .src = "key: rgba(255, 255, 255, -)",
         .capacity = TEST_CAPACITY,
         .expected_error = "number expected",
-    },
-    {
-        .type = TC_ERR,
-        .line = __LINE__,
-        .src = "key: rgba(255, 255, 255, 0.5)",
-        .capacity = TEST_CAPACITY,
-        .expected_error = "alpha must be in range (0, 1)",
     },
     {
         .type = TC_ERR,
