@@ -12,7 +12,7 @@ main(int argc, char *argv[])
         return 1;
     }
 
-    int capacity = 4096;
+    int capacity = cfg_file_size(argv[1]) + 4096;
     char *arena = malloc(capacity);
     if (arena == NULL) {
         fprintf(stderr, "Error: memory allocation failed\n");

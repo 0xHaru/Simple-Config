@@ -19,7 +19,7 @@ bg.color: rgba(255, 255, 255, 1)
 int
 main(void)
 {
-    int capacity = 4096;
+    int capacity = cfg_file_size("sample.cfg") + 4096;
     char *arena = malloc(capacity);
 
     CfgError err;

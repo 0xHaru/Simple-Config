@@ -625,13 +625,11 @@ cfg_load(const char *filename, Cfg *cfg, CfgError *err)
 }
 
 long
-cfg_file_size(const char *filename, CfgError *err)
+cfg_file_size(const char *filename)
 {
     FILE *file = fopen(filename, "rb");
-    if (!file) {
-        snprintf(err->msg, CFG_MAX_ERR, "failed to open file");
+    if (!file)
         return -1;
-    }
 
     fseek(file, 0, SEEK_END);
     return ftell(file);
