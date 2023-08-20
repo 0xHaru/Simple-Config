@@ -54,6 +54,16 @@ main(void)
 
 A fully working example can be found in `example.c`, to build it just run `make`.
 
+## Implementations
+
+The program has two implementations:
+
+-   The [first](https://github.com/0xHaru/Simple-Config/tree/master) one uses static arrays to store keys and strings. For this reason, a maximum length must be defined at compile time.
+
+-   The [second](https://github.com/0xHaru/Simple-Config/tree/arena) one uses a [memory arena](https://www.rfleury.com/p/untangling-lifetimes-the-arena-allocator) to address this limitation.
+
+Another viable strategy might be to represent keys and strings as pointers to "slices" within the source string.
+
 ## Specification
 
 -   A config file must have the `.cfg` file extension
