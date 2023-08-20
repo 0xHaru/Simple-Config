@@ -108,7 +108,7 @@ alloc(Cfg *cfg, int size, int align)
     int padding = -cfg->offset & (align - 1);
     if (size > avail - padding)
         return NULL;
-    void *p = (char*)(cfg->arena) + cfg->offset + padding;
+    void *p = (char *) (cfg->arena) + cfg->offset + padding;
     cfg->offset += padding + size;
     return memset(p, 0, size);
 }
