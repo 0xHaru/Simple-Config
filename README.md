@@ -23,7 +23,7 @@ main(void)
     CfgEntry *entries = malloc(64 * sizeof(CfgEntry));
     Cfg cfg = {.entries = entries, .capacity = 64};
 
-    int res = cfg_load("sample.cfg", &cfg, &err);
+    int res = cfg_parse_file("sample.cfg", &cfg, &err);
 
     if (res != 0) {
         cfg_fprint_error(stderr, &err);

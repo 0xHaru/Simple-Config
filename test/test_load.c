@@ -10,15 +10,15 @@ run_load_test(void)
     CfgEntry entries[TEST_CAPACITY];
     Cfg cfg = {.entries = entries, .capacity = TEST_CAPACITY};
 
-    ASSERT(0 == cfg_load("sample.cfg", &cfg, &err));
+    ASSERT(0 == cfg_parse_file("sample.cfg", &cfg, &err));
 
-    ASSERT(-1 == cfg_load("sample.txt", &cfg, &err));
+    ASSERT(-1 == cfg_parse_file("sample.txt", &cfg, &err));
     ASSERT(0 == strcmp("invalid file extension", err.msg));
 
-    ASSERT(-1 == cfg_load("", &cfg, &err));
+    ASSERT(-1 == cfg_parse_file("", &cfg, &err));
     ASSERT(0 == strcmp("invalid filename", err.msg));
 
-    ASSERT(-1 == cfg_load("sample2.cfg", &cfg, &err));
+    ASSERT(-1 == cfg_parse_file("sample2.cfg", &cfg, &err));
     ASSERT(0 == strcmp("failed to open file", err.msg));
 
     return OK;

@@ -21,7 +21,7 @@ main(int argc, char *argv[])
 
     CfgError err;
     Cfg cfg = {.entries = entries, .capacity = capacity};
-    int res = cfg_load(argv[1], &cfg, &err);
+    int res = cfg_parse_file(argv[1], &cfg, &err);
 
     if (res != 0) {
         cfg_fprint_error(stderr, &err);

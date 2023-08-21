@@ -59,7 +59,7 @@ run_error_test_1()
     CfgEntry entries[TEST_CAPACITY];
     Cfg cfg = {.entries = entries, .capacity = TEST_CAPACITY};
 
-    int res = cfg_load("", &cfg, &err);
+    int res = cfg_parse_file("", &cfg, &err);
     if (res == 0)
         return ABORT;
 
