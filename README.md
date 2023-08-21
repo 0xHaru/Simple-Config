@@ -24,7 +24,7 @@ main(void)
 
     CfgError err;
     Cfg cfg = {.arena = arena, .capacity = capacity};
-    int res = cfg_load("sample.cfg", &cfg, &err);
+    int res = cfg_parse_file("sample.cfg", &cfg, &err);
 
     if (res != 0) {
         cfg_fprint_error(stderr, &err);

@@ -594,7 +594,7 @@ read_file(Cfg *cfg, const char *filename, int *count, char *err)
 }
 
 int
-cfg_load(const char *filename, Cfg *cfg, CfgError *err)
+cfg_parse_file(const char *filename, Cfg *cfg, CfgError *err)
 {
     init_error(err);
 

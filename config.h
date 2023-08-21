@@ -76,7 +76,7 @@ int cfg_parse(const char *src, int src_len, Cfg *cfg, CfgError *err);
  *
  * @see cfg_parse() The underlying "wrapped" function
  */
-int cfg_load(const char *filename, Cfg *cfg, CfgError *err);
+int cfg_parse_file(const char *filename, Cfg *cfg, CfgError *err);
 
 long cfg_file_size(const char *filename);
 

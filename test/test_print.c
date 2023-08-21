@@ -64,7 +64,7 @@ run_error_test_1()
     CfgError err;
     Cfg cfg = {.arena = arena, .capacity = TEST_CAPACITY};
 
-    int res = cfg_load("", &cfg, &err);
+    int res = cfg_parse_file("", &cfg, &err);
     if (res == 0)
         return ABORT;
 
