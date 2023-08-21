@@ -298,40 +298,40 @@ static const TestCase test_cases[] = {
         .line = __LINE__,
         .src = "key: rgba(0.5",
         .expected_error =
-            "red, blue and green must be integers in range (0, 255)",
+            "red, blue and green must be integers in range [0, 255]",
     },
     {
         .type = TC_ERR,
         .line = __LINE__,
         .src = "key: rgba(-1",
         .expected_error =
-            "red, blue and green must be integers in range (0, 255)",
+            "red, blue and green must be integers in range [0, 255]",
     },
     {
         .type = TC_ERR,
         .line = __LINE__,
         .src = "key: rgba(-1",
         .expected_error =
-            "red, blue and green must be integers in range (0, 255)",
+            "red, blue and green must be integers in range [0, 255]",
     },
     {
         .type = TC_ERR,
         .line = __LINE__,
         .src = "key: rgba(256",
         .expected_error =
-            "red, blue and green must be integers in range (0, 255)",
+            "red, blue and green must be integers in range [0, 255]",
     },
     {
         .type = TC_ERR,
         .line = __LINE__,
         .src = "key: rgba(255, 255, 255, -1)",
-        .expected_error = "alpha must be in range (0, 1)",
+        .expected_error = "alpha must be in range [0, 1]",
     },
     {
         .type = TC_ERR,
         .line = __LINE__,
         .src = "key: rgba(255, 255, 255, 2)",
-        .expected_error = "alpha must be in range (0, 1)",
+        .expected_error = "alpha must be in range [0, 1]",
     },
     {
         .type = TC_ERR,
@@ -385,13 +385,13 @@ static const TestCase test_cases[] = {
         .type = TC_ERR,
         .line = __LINE__,
         .src = "key: rgba(255, 255, 255, 1.5)",
-        .expected_error = "alpha must be in range (0, 1)",
+        .expected_error = "alpha must be in range [0, 1]",
     },
     {
         .type = TC_ERR,
         .line = __LINE__,
         .src = "key: rgba(255, 255, 255, -0.5)",
-        .expected_error = "alpha must be in range (0, 1)",
+        .expected_error = "alpha must be in range [0, 1]",
     },
     {
         .type = TC_ERR,

@@ -7,7 +7,6 @@
 static TestResult
 run_file_size_test(void)
 {
-    CfgError err;
     ASSERT(163 == cfg_file_size("sample.cfg"));
     return OK;
 }
