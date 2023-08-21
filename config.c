@@ -118,6 +118,16 @@ match_literal(Scanner *s, int offset, const char *literal, int len)
 }
 
 static bool
+consume_literal(Scanner *s, int offset, const char *literal, int len)
+{
+    if (match_literal(s, offset, literal, len)) {
+        advance2(s, len);
+        return true;
+    }
+    return false;
+}
+
+static bool
 is_key(char ch)
 {
     return isalpha(ch) || ch == '.' || ch == '_';
@@ -316,11 +326,8 @@ parse_number(Scanner *s, CfgEntry *entry, CfgError *err)
 static int
 parse_rgba(Scanner *s, CfgEntry *entry, CfgError *err)
 {
-    if (!match_literal(s, cur(s), "rgba", 4))
+    if (!consume_literal(s, cur(s), "rgba", 4))
         return error(s, err, "invalid literal");
-
-    // Consume "rgba"
-    advance2(s, 4);
 
     // Skip blank space between 'a' and '('
     skip_blank(s);
@@ -339,7 +346,7 @@ parse_rgba(Scanner *s, CfgEntry *entry, CfgError *err)
         if (match_float(s))
             return error(s, err,
                          "red, blue and green must be "
-                         "integers in range (0, 255)");
+                         "integers in range [0, 255]");
 
         int number;
         if (consume_int(s, &number, err) != 0)
@@ -348,7 +355,7 @@ parse_rgba(Scanner *s, CfgEntry *entry, CfgError *err)
         if (number < 0 || number > 255)
             return error(s, err,
                          "red, blue and green must be "
-                         "integers in range (0, 255)");
+                         "integers in range [0, 255]");
 
         rgb[i] = (uint8_t) number;
 
@@ -365,35 +372,25 @@ parse_rgba(Scanner *s, CfgEntry *entry, CfgError *err)
     // Skip blank space preceding the number
     skip_blank(s);
 
-    CfgColor color;
+    uint8_t alpha;
     if (match_float(s)) {
         float number;
         if (consume_float(s, &number, err) != 0)
             return -1;
 
         if (number < 0 || number > 1)
-            return error(s, err, "alpha must be in range (0, 1)");
+            return error(s, err, "alpha must be in range [0, 1]");
 
-        color = (CfgColor){
-            .r = rgb[0],
-            .g = rgb[1],
-            .b = rgb[2],
-            .a = (uint8_t) (number * 255),
-        };
+        alpha = number * 255;
     } else {
         int number;
         if (consume_int(s, &number, err) != 0)
             return -1;
 
         if (number < 0 || number > 1)
-            return error(s, err, "alpha must be in range (0, 1)");
+            return error(s, err, "alpha must be in range [0, 1]");
 
-        color = (CfgColor){
-            .r = rgb[0],
-            .g = rgb[1],
-            .b = rgb[2],
-            .a = (uint8_t) (number * 255),
-        };
+        alpha = number * 255;
     }
 
     // Skip blank space following the number
@@ -405,7 +402,12 @@ parse_rgba(Scanner *s, CfgEntry *entry, CfgError *err)
     // Consume ')'
     advance(s);
 
-    entry->val.color = color;
+    entry->val.color = (CfgColor){
+        .r = rgb[0],
+        .g = rgb[1],
+        .b = rgb[2],
+        .a = alpha,
+    };
     entry->type = CFG_TYPE_COLOR;
     return 0;
 }
@@ -413,11 +415,8 @@ parse_rgba(Scanner *s, CfgEntry *entry, CfgError *err)
 static int
 parse_true(Scanner *s, CfgEntry *entry, CfgError *err)
 {
-    if (!match_literal(s, cur(s), "true", 4))
+    if (!consume_literal(s, cur(s), "true", 4))
         return error(s, err, "invalid literal");
-
-    // Consume "true"
-    advance2(s, 4);
 
     entry->val.boolean = true;
     entry->type = CFG_TYPE_BOOL;
@@ -427,11 +426,8 @@ parse_true(Scanner *s, CfgEntry *entry, CfgError *err)
 static int
 parse_false(Scanner *s, CfgEntry *entry, CfgError *err)
 {
-    if (!match_literal(s, cur(s), "false", 5))
+    if (!consume_literal(s, cur(s), "false", 5))
         return error(s, err, "invalid literal");
-
-    // Consume "false"
-    advance2(s, 5);
 
     entry->val.boolean = false;
     entry->type = CFG_TYPE_BOOL;
